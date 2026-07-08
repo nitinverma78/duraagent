@@ -38,7 +38,16 @@ class CodeAnalyzer:
         resp = self.llm.call(system, user)
         
         store.append_event(
-            events.llm_call_recorded(run_id, resp.model, resp.input_tokens, resp.output_tokens)
+            events.llm_call_recorded(
+                run_id=run_id,
+                step_name="analyze_code",
+                model=resp.model,
+                input_tokens=resp.input_tokens,
+                output_tokens=resp.output_tokens,
+                latency_ms=resp.latency_ms,
+                prompt_hash=resp.prompt_hash,
+                cached=resp.cached
+            )
         )
         
         try:
@@ -58,7 +67,16 @@ class PatchGenerator:
         resp = self.llm.call(system, user)
         
         store.append_event(
-            events.llm_call_recorded(run_id, resp.model, resp.input_tokens, resp.output_tokens)
+            events.llm_call_recorded(
+                run_id=run_id,
+                step_name="generate_patch",
+                model=resp.model,
+                input_tokens=resp.input_tokens,
+                output_tokens=resp.output_tokens,
+                latency_ms=resp.latency_ms,
+                prompt_hash=resp.prompt_hash,
+                cached=resp.cached
+            )
         )
         
         try:
@@ -107,7 +125,16 @@ class PatchVerifier:
             resp = self.llm.call(system, user)
             
             self.store.append_event(
-                events.llm_call_recorded(run_id, resp.model, resp.input_tokens, resp.output_tokens)
+                events.llm_call_recorded(
+                    run_id=run_id,
+                    step_name="verify_and_correct",
+                    model=resp.model,
+                    input_tokens=resp.input_tokens,
+                    output_tokens=resp.output_tokens,
+                    latency_ms=resp.latency_ms,
+                    prompt_hash=resp.prompt_hash,
+                    cached=resp.cached
+                )
             )
 
             try:
