@@ -150,18 +150,20 @@ class Agent:
 
         patch_data = self.generator.generate_patch(analysis)
             
-        from duraagent.autonomy import AutonomyScorer
+        from duraagent.autonomy import HeuristicScorer
+        from duraagent.types import AutonomyLevel
         from duraagent.workflow import WorkflowPaused
         
-        scorer = AutonomyScorer()
-        autonomy_result = scorer.evaluate_patch(patch_data)
+        scorer = HeuristicScorer()
+        # Assume max_level is L3 for this agent step
+        autonomy_result = scorer.evaluate(patch_data, AutonomyLevel.L3_AUTONOMOUS)
         
-        if autonomy_result["should_escalate"]:
+        if autonomy_result.should_escalate:
             self.store.append_event(
                 events.Event(
                     run_id=run_id,
                     event_type="workflow_paused",
-                    payload={"reason": "Autonomy threshold exceeded", "details": autonomy_result["reasons"]}
+                    payload={"reason": "Autonomy threshold exceeded", "details": autonomy_result.reasons}
                 )
             )
             raise WorkflowPaused("Autonomy check failed. Escalating to human.")

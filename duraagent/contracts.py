@@ -1,36 +1,70 @@
 """
 Typed tool contracts for DuraAgent.
 
-Every tool interaction (sandbox execution, LLM call, patch application)
-has a defined contract with:
-- Input/output schemas
-- Error codes
-- Timeout limits
-- Idempotency guarantees
-
-This prevents "hallucinated" tool usage and ensures the agent operates
-within safe, predictable boundaries.
+Layer: Harness Engineering
+Role:  Every tool interaction (sandbox execution, LLM call, patch application)
+       has a defined contract with input/output schemas, error codes, and
+       idempotency guarantees. This prevents hallucinated tool usage and
+       ensures the agent operates within safe, predictable boundaries.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any
 
-
-@dataclass(frozen=True)
-class ToolContract:
-    """Defines the contract for a tool interaction."""
-
-    name: str
-    description: str
-    input_schema: dict[str, Any] = field(default_factory=dict)
-    output_schema: dict[str, Any] = field(default_factory=dict)
-    error_codes: dict[int, str] = field(default_factory=dict)
-    timeout_ms: int = 30_000
-    idempotent: bool = False
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
+class ToolContract(BaseModel):
+    """
+    Defines the strict contract for a tool interaction.
+    Using Pydantic allows runtime validation of inputs and outputs
+    against JSON Schema before executing tools or returning to LLM.
+    """
+    model_config = ConfigDict(frozen=True)
+
+    name: str = Field(..., description="Unique tool name")
+    description: str = Field(..., description="LLM-facing tool description")
+    input_schema: dict[str, Any] = Field(default_factory=dict)
+    output_schema: dict[str, Any] = Field(default_factory=dict)
+    error_codes: dict[int, str] = Field(default_factory=dict)
+    timeout_ms: int = Field(default=30_000, ge=1)
+    idempotent: bool = Field(default=False)
+
+    def validate_input(self, data: dict[str, Any]) -> bool:
+        """Validate input payload against the contract schema."""
+        required = self.input_schema.get("required", [])
+        for req in required:
+            if req not in data:
+                return False
+        return True
+
+    def validate_output(self, data: dict[str, Any]) -> bool:
+        """Validate output payload against the contract schema."""
+        properties = self.output_schema.get("properties", {})
+        for key in data:
+            if key not in properties:
+                return False
+        return True
+
+
+class ToolRegistry:
+    """Registry of all available tool contracts."""
+    
+    def __init__(self):
+        self._tools: dict[str, ToolContract] = {}
+
+    def register(self, contract: ToolContract) -> None:
+        self._tools[contract.name] = contract
+
+    def get(self, name: str) -> ToolContract | None:
+        return self._tools.get(name)
+
+    def list_tools(self) -> list[ToolContract]:
+        return list(self._tools.values())
+
+
+# Standard Tools
 SANDBOX_EXECUTE = ToolContract(
     name="sandbox_execute",
     description="Execute Python code in an isolated subprocess",
@@ -134,3 +168,10 @@ PATCH_APPLY = ToolContract(
     timeout_ms=5_000,
     idempotent=False,
 )
+
+# Initialize default registry
+default_registry = ToolRegistry()
+default_registry.register(SANDBOX_EXECUTE)
+default_registry.register(RUN_TESTS)
+default_registry.register(LLM_CALL)
+default_registry.register(PATCH_APPLY)
