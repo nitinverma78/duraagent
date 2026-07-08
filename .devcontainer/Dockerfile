@@ -1,8 +1,7 @@
 FROM mcr.microsoft.com/devcontainers/python:1-3.11-bullseye
 
-# Install uv for fast dependency management
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:$PATH"
+# Install uv globally by copying the binary from the official image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Setup the workspace
 WORKDIR /workspace
