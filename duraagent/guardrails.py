@@ -35,7 +35,7 @@ class AbstractGuardrail(ABC):
         pass
 
     @abstractmethod
-    def check(self, payload: dict[str, Any]) -> GuardrailResult:
+    def check(self, payload: Any) -> GuardrailResult:
         """Evaluate the payload and return whether it passes."""
         pass
 
@@ -47,8 +47,8 @@ class PatchSafetyGuardrail(AbstractGuardrail):
     def name(self) -> str:
         return "PatchSafety"
 
-    def check(self, payload: dict[str, Any]) -> GuardrailResult:
-        code = payload.get("new_code", "")
+    def check(self, payload: Any) -> GuardrailResult:
+        patches = payload if isinstance(payload, list) else [payload]
         
         dangerous_patterns = [
             (r"os\.system\s*\(", "System call execution"),
@@ -57,13 +57,17 @@ class PatchSafetyGuardrail(AbstractGuardrail):
             (r"rm\s+-rf", "File deletion"),
         ]
         
-        for pattern, description in dangerous_patterns:
-            if re.search(pattern, code, re.IGNORECASE):
-                return GuardrailResult(
-                    passed=False,
-                    reason=f"Dangerous pattern detected: {description}",
-                    remediation="Rewrite the patch to use safe, restricted APIs.",
-                )
+        for p in patches:
+            if not isinstance(p, dict):
+                continue
+            code = p.get("new_code", "") + "\n" + p.get("full_code", "")
+            for pattern, description in dangerous_patterns:
+                if re.search(pattern, code, re.IGNORECASE):
+                    return GuardrailResult(
+                        passed=False,
+                        reason=f"Dangerous pattern detected: {description}",
+                        remediation="Rewrite the patch to use safe, restricted APIs.",
+                    )
                 
         return GuardrailResult(passed=True)
 
@@ -79,7 +83,7 @@ class RepetitionGuardrail(AbstractGuardrail):
     def name(self) -> str:
         return "Repetition"
 
-    def check(self, payload: dict[str, Any]) -> GuardrailResult:
+    def check(self, payload: Any) -> GuardrailResult:
         # Simple content hash for exact repetition detection
         content = str(payload)
         content_hash = hashlib.md5(content.encode()).hexdigest()
@@ -102,7 +106,7 @@ class GuardrailPipeline:
     def __init__(self, guardrails: list[AbstractGuardrail] | None = None):
         self.guardrails = guardrails or []
 
-    def check_all(self, payload: dict[str, Any]) -> GuardrailResult:
+    def check_all(self, payload: Any) -> GuardrailResult:
         """Run payload through all guardrails. Fails fast on first rejection."""
         for guardrail in self.guardrails:
             result = guardrail.check(payload)

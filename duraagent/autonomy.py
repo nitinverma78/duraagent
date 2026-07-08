@@ -33,7 +33,7 @@ class AbstractAutonomyScorer(ABC):
     """Base class for evaluating patch/plan autonomy risks."""
     
     @abstractmethod
-    def evaluate(self, payload: dict[str, Any], max_level: AutonomyLevel) -> AutonomyScore:
+    def evaluate(self, payload: Any, max_level: AutonomyLevel) -> AutonomyScore:
         """Evaluate action payload and return an autonomy score."""
         pass
 
@@ -45,28 +45,36 @@ class HeuristicScorer(AbstractAutonomyScorer):
         self.uncertainty_threshold = uncertainty_threshold
         self.novelty_threshold = novelty_threshold
 
-    def evaluate(self, payload: dict[str, Any], max_level: AutonomyLevel) -> AutonomyScore:
+    def evaluate(self, payload: Any, max_level: AutonomyLevel) -> AutonomyScore:
         uncertainty = 0.1
         novelty = 0.1
         reasons = []
 
-        # Heuristic 1: Large diffs increase uncertainty
-        old_code = payload.get("old_code", "")
-        new_code = payload.get("new_code", "")
-        
-        if abs(len(new_code) - len(old_code)) > 500:
-            uncertainty += 0.5
-            reasons.append("Large code modification detected.")
+        patches = payload if isinstance(payload, list) else [payload]
+        for p in patches:
+            if not isinstance(p, dict):
+                continue
+            # Heuristic 1: Large diffs increase uncertainty
+            old_code = p.get("old_code", "")
+            new_code = p.get("new_code", "")
+            full_code = p.get("full_code", "")
             
-        if payload.get("requires_db_migration", False):
-            uncertainty += 0.8
-            reasons.append("Database migration detected.")
-            
-        # Heuristic 2: Touching core configuration increases novelty
-        file_path = payload.get("file", "")
-        if "config" in file_path or "settings" in file_path or file_path.endswith(".toml"):
-            novelty += 0.7
-            reasons.append("Core configuration modification detected.")
+            if abs(len(new_code) - len(old_code)) > 500 or len(full_code) > 1000:
+                uncertainty += 0.5
+                if "Large code modification detected." not in reasons:
+                    reasons.append("Large code modification detected.")
+                
+            if p.get("requires_db_migration", False):
+                uncertainty += 0.8
+                if "Database migration detected." not in reasons:
+                    reasons.append("Database migration detected.")
+                
+            # Heuristic 2: Touching core configuration increases novelty
+            file_path = p.get("file", "")
+            if "config" in file_path or "settings" in file_path or file_path.endswith(".toml"):
+                novelty += 0.7
+                if "Core configuration modification detected." not in reasons:
+                    reasons.append("Core configuration modification detected.")
 
         uncertainty = round(min(1.0, uncertainty), 3)
         novelty = round(min(1.0, novelty), 3)
