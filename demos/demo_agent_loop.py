@@ -18,7 +18,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from duraagent.agent import Agent
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 from duraagent.harness import SandboxRunner
 
 
@@ -45,7 +45,7 @@ def main():
     print(f"   Result: {initial_res.passed} passed, {initial_res.failed} failed\n")
     
     # 3. Initialize Agent
-    store = StateStore(db_path)
+    store = SQLiteStateStore(db_path)
     agent = Agent(store=store, runner=runner)
 
     # 4. Run the Agent Loop

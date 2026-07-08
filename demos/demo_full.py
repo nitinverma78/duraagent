@@ -31,7 +31,7 @@ from duraagent.llm import LLMClient, LLMResponse
 from duraagent.metrics import MetricsTracker
 from duraagent.rewards import RewardCalculator
 from duraagent.skills import Skill, SkillLibrary
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 from duraagent.workflow import WorkflowPaused
 
 
@@ -67,7 +67,7 @@ def main():
         f.write("settings = true")
 
     db_path = os.path.join(work_dir, "duraagent.db")
-    store = StateStore(db_path)
+    store = SQLiteStateStore(db_path)
     
     print(f"\n🌟 Starting DuraAgent End-to-End Demo")
     print(f"📁 Working directory: {work_dir}\n")

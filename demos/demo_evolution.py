@@ -23,7 +23,7 @@ from duraagent.harness import SandboxRunner
 from duraagent.metrics import MetricsTracker
 from duraagent.rewards import RewardCalculator
 from duraagent.skills import Skill, SkillLibrary
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 
 
 def main():
@@ -37,7 +37,7 @@ def main():
     print(f"\n🧬 Starting Layer 5 Demo: Self-Evolution via RLVR")
     print(f"📁 Working directory: {work_dir}\n")
 
-    store = StateStore(db_path)
+    store = SQLiteStateStore(db_path)
     runner = SandboxRunner()
     metrics = MetricsTracker(store)
     reward_calc = RewardCalculator(metrics)

@@ -18,14 +18,14 @@ from duraagent.events import (
     step_skipped,
     memory_stored,
 )
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 
 
 @pytest.fixture
 def store(tmp_path):
     """Create a fresh state store for each test."""
     db_path = tmp_path / "test.db"
-    return StateStore(db_path)
+    return SQLiteStateStore(db_path)
 
 
 class TestEventLog:

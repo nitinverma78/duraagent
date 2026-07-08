@@ -20,7 +20,7 @@ from duraagent import events
 from duraagent.contracts import LLM_CALL, PATCH_APPLY, RUN_TESTS
 from duraagent.harness import PatchApplier, SandboxRunner
 from duraagent.llm import LLMClient
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 from duraagent.workflow import DurableWorkflow, RetryPolicy, Step
 
 
@@ -31,7 +31,7 @@ class Agent:
 
     def __init__(
         self,
-        store: StateStore,
+        store: SQLiteStateStore,
         llm: LLMClient | None = None,
         runner: SandboxRunner | None = None,
     ):

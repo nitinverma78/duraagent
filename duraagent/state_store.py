@@ -30,7 +30,33 @@ from duraagent.events import (
 )
 
 
-class StateStore:
+from abc import ABC, abstractmethod
+
+class AbstractStateStore(ABC):
+    """Abstract Base Class for the event-sourced state store."""
+    
+    @abstractmethod
+    def append_event(self, event: Event) -> None:
+        pass
+
+    @abstractmethod
+    def get_events(self, run_id: str) -> list[Event]:
+        pass
+
+    @abstractmethod
+    def get_workflow_state(self, run_id: str) -> dict[str, Any] | None:
+        pass
+
+    @abstractmethod
+    def get_step_state(self, run_id: str, step_name: str) -> dict[str, Any] | None:
+        pass
+
+    @abstractmethod
+    def get_last_completed_step_index(self, run_id: str) -> int:
+        pass
+
+
+class SQLiteStateStore(AbstractStateStore):
     """
     SQLite-backed event-sourced state store.
 

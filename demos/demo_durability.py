@@ -25,7 +25,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from duraagent.events import EventType
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 from duraagent.workflow import (
     DurableWorkflow,
     RetryPolicy,
@@ -84,7 +84,7 @@ def print_separator(title: str) -> None:
     print(f"{'═' * 60}\n")
 
 
-def print_event_log(store: StateStore, run_id: str) -> None:
+def print_event_log(store: SQLiteStateStore, run_id: str) -> None:
     """Print the full event log for a run."""
     print_separator("📋 EVENT LOG (Source of Truth)")
     for i, event in enumerate(store.get_events(run_id)):
@@ -123,7 +123,7 @@ def main():
     # Use a temp directory for the database
     db_dir = tempfile.mkdtemp(prefix="duraagent_demo_")
     db_path = os.path.join(db_dir, "demo.db")
-    store = StateStore(db_path)
+    store = SQLiteStateStore(db_path)
 
     # Fixed run_id so we can "resume" the same run
     run_id = "demo-durability-001"

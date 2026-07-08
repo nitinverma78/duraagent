@@ -13,11 +13,11 @@ from __future__ import annotations
 from typing import Any
 
 from duraagent.events import EventType
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 
 
 class MetricsTracker:
-    def __init__(self, store: StateStore):
+    def __init__(self, store: SQLiteStateStore):
         self.store = store
 
     def get_workflow_metrics(self, run_id: str) -> dict[str, Any]:

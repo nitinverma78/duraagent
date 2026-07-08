@@ -3,7 +3,7 @@
 import pytest
 
 from duraagent.events import StepStatus, WorkflowStatus
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 from duraagent.workflow import (
     DurableWorkflow,
     RetryPolicy,
@@ -16,7 +16,7 @@ from duraagent.workflow import (
 @pytest.fixture
 def store(tmp_path):
     """Create a fresh state store for each test."""
-    return StateStore(tmp_path / "test.db")
+    return SQLiteStateStore(tmp_path / "test.db")
 
 
 class TestRetryPolicy:

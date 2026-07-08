@@ -23,7 +23,10 @@ from typing import Any, Callable
 
 from duraagent import events
 from duraagent.events import StepStatus, WorkflowStatus
-from duraagent.state_store import StateStore
+from duraagent.state_store import AbstractStateStore
+
+from fastcore.basics import GetAttr
+from pydantic import BaseModel, Field
 
 
 @dataclass
@@ -94,7 +97,7 @@ class DurableWorkflow:
         self,
         name: str,
         steps: list[Step],
-        store: StateStore,
+        store: AbstractStateStore,
         run_id: str | None = None,
     ):
         self.name = name

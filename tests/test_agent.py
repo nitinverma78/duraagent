@@ -8,7 +8,7 @@ import pytest
 from duraagent.agent import Agent
 from duraagent.harness import SandboxRunner, TestResult
 from duraagent.llm import LLMClient, LLMResponse
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 
 
 class MockLLM(LLMClient):
@@ -39,7 +39,7 @@ class MockRunner(SandboxRunner):
 
 def test_agent_successful_first_try(tmp_path):
     """Test agent succeeds without needing self-correction."""
-    store = StateStore(tmp_path / "db")
+    store = SQLiteStateStore(tmp_path / "db")
     
     llm = MockLLM([
         '{"issues": []}',  # Analysis
@@ -65,7 +65,7 @@ def test_agent_successful_first_try(tmp_path):
 
 def test_agent_self_correction_loop(tmp_path):
     """Test agent fails first time, corrects itself on second try."""
-    store = StateStore(tmp_path / "db")
+    store = SQLiteStateStore(tmp_path / "db")
     
     llm = MockLLM([
         '{"issues": []}',  # Analysis

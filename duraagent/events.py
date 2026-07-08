@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import asdict, dataclass, field
+
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -72,8 +72,9 @@ class StepStatus(str, Enum):
     SKIPPED = "skipped"
 
 
-@dataclass(frozen=True)
-class Event:
+from pydantic import BaseModel, Field, ConfigDict
+
+class Event(BaseModel):
     """
     A single immutable event in the system.
 
@@ -83,33 +84,32 @@ class Event:
     - A type
     - A timestamp (UTC)
     - A payload (arbitrary dict)
-
-    Events are frozen (immutable) dataclasses — once created, they cannot be modified.
-    This is the core guarantee of event sourcing: the log is append-only.
+    
+    Using Pydantic ensures strict type validation on creation.
     """
+    model_config = ConfigDict(frozen=True)
 
-    event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     run_id: str = ""
     event_type: str = ""
-    timestamp: str = field(
+    timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
-    payload: dict[str, Any] = field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=dict)
 
     def to_json(self) -> str:
         """Serialize to JSON string for storage."""
-        return json.dumps(asdict(self), default=str, ensure_ascii=False)
+        return self.model_dump_json()
 
     @classmethod
     def from_json(cls, json_str: str) -> Event:
         """Deserialize from JSON string."""
-        data = json.loads(json_str)
-        return cls(**data)
+        return cls.model_validate_json(json_str)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Event:
         """Construct from a dictionary."""
-        return cls(**data)
+        return cls.model_validate(data)
 
 
 # ── Factory functions for each event type ──────────────────────────────────

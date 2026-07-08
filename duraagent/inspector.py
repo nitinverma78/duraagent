@@ -14,11 +14,11 @@ import sys
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from duraagent.state_store import StateStore
+from duraagent.state_store import SQLiteStateStore
 from duraagent.metrics import MetricsTracker
 
 
-def print_run_list(store: StateStore):
+def print_run_list(store: SQLiteStateStore):
     runs = store.get_all_runs()
     if not runs:
         print("No runs found in database.")
@@ -30,7 +30,7 @@ def print_run_list(store: StateStore):
         print(f"{r['run_id']:<25} | {r['workflow_name']:<15} | {r['status']:<10} | {r['created_at']}")
 
 
-def print_run_details(store: StateStore, run_id: str):
+def print_run_details(store: SQLiteStateStore, run_id: str):
     state = store.get_workflow_state(run_id)
     if not state:
         print(f"Run {run_id} not found.")
@@ -70,7 +70,7 @@ def main():
         print(f"Database {args.db} not found.")
         sys.exit(1)
         
-    store = StateStore(args.db)
+    store = SQLiteStateStore(args.db)
     
     if args.run_id:
         print_run_details(store, args.run_id)

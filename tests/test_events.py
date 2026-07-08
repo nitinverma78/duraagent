@@ -1,3 +1,5 @@
+import pytest
+
 """Tests for the immutable event system."""
 
 import json
@@ -30,11 +32,9 @@ class TestEvent:
 
     def test_event_is_immutable(self):
         event = Event(event_id="test-1", run_id="run-1")
-        try:
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
             event.run_id = "changed"  # type: ignore
-            assert False, "Should have raised FrozenInstanceError"
-        except AttributeError:
-            pass  # Expected — frozen dataclass
 
     def test_event_serialization_roundtrip(self):
         event = workflow_started("run-1", "my_workflow", {"key": "value"})
