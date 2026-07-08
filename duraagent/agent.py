@@ -14,6 +14,7 @@ it resumes exactly where it left off.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from duraagent import events
@@ -25,6 +26,14 @@ from duraagent.workflow import DurableWorkflow, RetryPolicy, Step
 from duraagent.tracing import Tracer, traced, set_tracer
 from duraagent.guardrails import GuardrailPipeline, PatchSafetyGuardrail, RepetitionGuardrail
 from duraagent.memory import WorkingMemory, EpisodicMemory
+
+
+def extract_json(text: str) -> str:
+    """Extract JSON from markdown code blocks if present."""
+    match = re.search(r'```(?:json)?\s*(\{.*\}|\[.*\])\s*```', text, re.DOTALL)
+    if match:
+        return match.group(1)
+    return text
 
 
 class CodeAnalyzer:
@@ -51,7 +60,7 @@ class CodeAnalyzer:
         )
         
         try:
-            return json.loads(resp.content)
+            return json.loads(extract_json(resp.content))
         except json.JSONDecodeError:
             return {"raw": resp.content}
 
@@ -80,7 +89,7 @@ class PatchGenerator:
         )
         
         try:
-            return json.loads(resp.content)
+            return json.loads(extract_json(resp.content))
         except json.JSONDecodeError:
             return {"raw": resp.content}
 
@@ -138,7 +147,7 @@ class PatchVerifier:
             )
 
             try:
-                new_patch = json.loads(resp.content)
+                new_patch = json.loads(extract_json(resp.content))
                 if "old_code" in new_patch and "new_code" in new_patch and "file" in new_patch:
                     target = f"{project_dir}/{new_patch['file']}"
                     PatchApplier.apply_simple_patch(target, new_patch["old_code"], new_patch["new_code"])
