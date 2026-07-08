@@ -33,7 +33,29 @@ def extract_json(text: str) -> str:
     match = re.search(r'```(?:json)?\s*(\{.*\}|\[.*\])\s*```', text, re.DOTALL)
     if match:
         return match.group(1)
-    return text
+    
+    start_idx_brace = text.find('{')
+    start_idx_bracket = text.find('[')
+    
+    if start_idx_brace == -1 and start_idx_bracket == -1:
+        return text
+        
+    if start_idx_brace != -1 and start_idx_bracket != -1:
+        start_idx = min(start_idx_brace, start_idx_bracket)
+    elif start_idx_brace != -1:
+        start_idx = start_idx_brace
+    else:
+        start_idx = start_idx_bracket
+        
+    if text[start_idx] == '{':
+        end_idx = text.rfind('}')
+    else:
+        end_idx = text.rfind(']')
+        
+    if end_idx != -1 and end_idx >= start_idx:
+        return text[start_idx:end_idx+1]
+        
+    return text[start_idx:]
 
 
 class CodeAnalyzer:
@@ -42,8 +64,22 @@ class CodeAnalyzer:
         self.llm = llm
 
     def analyze(self, project_dir: str, store: SQLiteStateStore, run_id: str) -> dict[str, Any]:
-        system = "You are an expert Python developer. Analyze the code for bugs."
-        user = f"Find bugs in the project at {project_dir}"
+        system = "You are an expert Python developer. Analyze the code for bugs. Output JSON with a list of 'issues' where each issue has 'file' and 'description'."
+        
+        import os
+        files_content = ""
+        for root, _, files in os.walk(project_dir):
+            for file in files:
+                if file.endswith('.py'):
+                    path = os.path.join(root, file)
+                    rel_path = os.path.relpath(path, project_dir)
+                    try:
+                        with open(path, 'r') as f:
+                            files_content += f"\n--- {rel_path} ---\n{f.read()}"
+                    except Exception:
+                        pass
+        
+        user = f"Find bugs in the project at {project_dir}. Here are the files:\n{files_content}"
         resp = self.llm.call(system, user)
         
         store.append_event(
