@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: duraagent
+Version: 0.1.0
+Summary: Production-grade self-evolving agentic code review engine
+Requires-Python: >=3.11
+Requires-Dist: fastcore>=1.14.4
+Requires-Dist: pydantic>=2.13.4
+Requires-Dist: pytest>=9.1.1
+Requires-Dist: fastapi>=0.111.0
+Requires-Dist: uvicorn>=0.30.0
+Requires-Dist: python-multipart>=0.0.9
+Provides-Extra: llm
+Requires-Dist: anthropic>=0.40.0; extra == "llm"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0.0; extra == "dev"

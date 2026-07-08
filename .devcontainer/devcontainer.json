@@ -1,0 +1,28 @@
+{
+  "name": "DuraAgent Codespace",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/workspace/.venv/bin/python",
+        "editor.formatOnSave": true
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ]
+    }
+  },
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "FastAPI Web Server",
+      "onAutoForward": "notify",
+      "requireLocalPort": true
+    }
+  },
+  "postCreateCommand": "uv venv /workspace/.venv && source /workspace/.venv/bin/activate && uv pip install -e .",
+  "remoteUser": "vscode"
+}
