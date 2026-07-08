@@ -99,6 +99,8 @@ class PatchGenerator:
             
         user = f"Fix these bugs: {json.dumps(analysis)}\n\nHere are the files:\n{files_content}"
         resp = self.llm.call(system, user)
+        print("--- CLAUDE PATCH GENERATOR RAW OUTPUT ---")
+        print(resp.content[:1000] + ("..." if len(resp.content) > 1000 else ""))
         
         store.append_event(
             events.llm_call_recorded(
@@ -115,7 +117,9 @@ class PatchGenerator:
         
         try:
             return json.loads(extract_json(resp.content))
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print("FAILED TO PARSE JSON IN PATCH GENERATOR:", e)
+            print("Extracted content was:", extract_json(resp.content)[:500])
             return {"raw": resp.content}
 
 
@@ -145,6 +149,7 @@ class PatchVerifier:
                     try:
                         with open(target, 'w') as f:
                             f.write(p["full_code"])
+                        print(f"SUCCESS: WROTE full_code TO {target}")
                     except Exception as e:
                         print("Failed to write full_code:", e)
                     continue
@@ -182,6 +187,10 @@ class PatchVerifier:
                 )
                 return {"status": "success", "attempts": attempt, "test_output": test_res.output}
 
+            print(f"--- ATTEMPT {attempt} FAILED ---")
+            print(test_res.output)
+            print("--------------------------------")
+            
             self.store.append_event(
                 events.correction_attempted(
                     run_id, "verify_and_correct", attempt, step_name,
@@ -219,6 +228,8 @@ class PatchVerifier:
                 
             user = f"Fix these bugs: {test_res.output}. Here was the previous patch: {json.dumps(patch)}\n\nCurrent file contents:\n{files_content}"
             resp = self.llm.call(system, user)
+            print(f"--- CLAUDE VERIFY (ATTEMPT {attempt}) RAW OUTPUT ---")
+            print(resp.content[:1000] + ("..." if len(resp.content) > 1000 else ""))
             
             self.store.append_event(
                 events.llm_call_recorded(
@@ -236,7 +247,10 @@ class PatchVerifier:
             try:
                 new_patch = json.loads(extract_json(resp.content))
                 self._apply_patches(project_dir, new_patch)
-            except json.JSONDecodeError:
+                patch = new_patch  # update patch to new list
+            except json.JSONDecodeError as e:
+                print(f"FAILED TO PARSE JSON IN VERIFIER (ATTEMPT {attempt}):", e)
+                print("Extracted content was:", extract_json(resp.content))
                 pass
 
         return {"status": "failed", "attempts": max_corrections, "test_output": "Tests still failing after max corrections"}
