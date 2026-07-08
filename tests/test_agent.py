@@ -7,11 +7,11 @@ import pytest
 
 from duraagent.agent import Agent
 from duraagent.harness import SandboxRunner, TestResult
-from duraagent.llm import LLMClient, LLMResponse
+from duraagent.llm import get_llm_client, MockLLMClient, LLMResponse
 from duraagent.state_store import SQLiteStateStore
 
 
-class MockLLM(LLMClient):
+class MockLLM(MockLLMClient):
     """Mock LLM that returns deterministic responses for testing."""
     def __init__(self, responses):
         super().__init__()

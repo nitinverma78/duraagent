@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from duraagent.agent import Agent
 from duraagent.evolution import EvolutionEngine
 from duraagent.harness import SandboxRunner
-from duraagent.llm import LLMClient, LLMResponse
+from duraagent.llm import get_llm_client, MockLLMClient, AbstractLLMClient, LLMResponse
 from duraagent.metrics import MetricsTracker
 from duraagent.rewards import RewardCalculator
 from duraagent.skills import Skill, SkillLibrary
@@ -35,7 +35,7 @@ from duraagent.state_store import SQLiteStateStore
 from duraagent.workflow import WorkflowPaused
 
 
-class EscalationMockLLM(LLMClient):
+class EscalationMockLLM(MockLLMClient):
     """A mock LLM that intentionally generates a 'scary' patch to trigger escalation."""
     def call(self, system_prompt, user_prompt, **kwargs):
         if "analyze" in user_prompt.lower() or "find bugs" in user_prompt.lower():
@@ -100,7 +100,7 @@ def main():
         # the human modified the patch manually. We'll just print success for the demo flow.
         
         # We'll just run it again with a normal LLM so it passes the autonomy check and finishes.
-        agent.llm = LLMClient() # Normal mock LLM
+        agent.llm = get_llm_client() # Normal mock LLM
         print("🤖 Agent resuming execution with approved (safer) patch...")
         res = agent.review_and_fix(proj_dir, run_id=run_id)
         

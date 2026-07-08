@@ -19,7 +19,7 @@ from typing import Any
 from duraagent import events
 from duraagent.contracts import LLM_CALL, PATCH_APPLY, RUN_TESTS
 from duraagent.harness import PatchApplier, SandboxRunner
-from duraagent.llm import LLMClient
+from duraagent.llm import AbstractLLMClient
 from duraagent.state_store import SQLiteStateStore
 from duraagent.workflow import DurableWorkflow, RetryPolicy, Step
 
@@ -32,11 +32,11 @@ class Agent:
     def __init__(
         self,
         store: SQLiteStateStore,
-        llm: LLMClient | None = None,
+        llm: AbstractLLMClient | None = None,
         runner: SandboxRunner | None = None,
     ):
         self.store = store
-        self.llm = llm or LLMClient()
+        self.llm = llm or AbstractLLMClient()
         self.runner = runner or SandboxRunner()
 
     def review_and_fix(self, project_dir: str, run_id: str | None = None) -> dict[str, Any]:

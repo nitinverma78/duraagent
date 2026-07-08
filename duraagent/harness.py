@@ -200,12 +200,6 @@ class PatchApplier:
         """Restore a project from backup."""
         backup_project = os.path.join(backup_dir, "project")
         if os.path.exists(backup_project):
-            for item in os.listdir(backup_project):
-                src = os.path.join(backup_project, item)
-                dst = os.path.join(str(project_dir), item)
-                if os.path.isdir(src):
-                    if os.path.exists(dst):
-                        shutil.rmtree(dst)
-                    shutil.copytree(src, dst)
-                else:
-                    shutil.copy2(src, dst)
+            if os.path.exists(project_dir):
+                shutil.rmtree(project_dir)
+            shutil.copytree(backup_project, project_dir)

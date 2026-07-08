@@ -52,67 +52,70 @@ def hash_prompt(system: str, user: str) -> str:
     return hashlib.sha256(combined.encode()).hexdigest()[:12]
 
 
-class LLMClient:
-    """
-    Unified LLM client with Claude SDK + mock fallback.
+from abc import ABC, abstractmethod
 
-    Usage:
-        client = LLMClient()  # auto-detects API key
-        response = client.call("You are a code reviewer", "Review this code: ...")
-    """
+class AbstractLLMClient(ABC):
+    """Abstract interface for LLM calls."""
+    
+    @abstractmethod
+    def call(self, system_prompt: str, user_prompt: str, max_tokens: int = 4096, temperature: float = 0.0) -> LLMResponse:
+        pass
+        
+    @property
+    @abstractmethod
+    def is_mock(self) -> bool:
+        pass
+        
+    @abstractmethod
+    def get_usage_summary(self) -> dict[str, Any]:
+        pass
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+
+class BaseLLMClient(AbstractLLMClient):
+    """Base class handling token counting and cost estimation."""
+    def __init__(self, model: str):
         self.model = model
-        self.api_key = os.environ.get("ANTHROPIC_API_KEY")
-        self._client = None
         self._total_input_tokens = 0
         self._total_output_tokens = 0
         self._total_cost = 0.0
         self._call_count = 0
+        
+    def _update_metrics(self, input_tokens: int, output_tokens: int) -> None:
+        self._total_input_tokens += input_tokens
+        self._total_output_tokens += output_tokens
+        self._total_cost += estimate_cost(self.model, input_tokens, output_tokens)
+        self._call_count += 1
+        
+    def get_usage_summary(self) -> dict[str, Any]:
+        return {
+            "total_calls": self._call_count,
+            "total_input_tokens": self._total_input_tokens,
+            "total_output_tokens": self._total_output_tokens,
+            "total_cost_usd": round(self._total_cost, 4),
+            "model": self.model if not self.is_mock else "mock",
+            "is_mock": self.is_mock,
+        }
 
-        if self.api_key:
-            try:
-                import anthropic
-                self._client = anthropic.Anthropic(api_key=self.api_key)
-            except ImportError:
-                pass  # Fall back to mock
+class ClaudeLLMClient(BaseLLMClient):
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-20250514"):
+        super().__init__(model)
+        import anthropic
+        self._client = anthropic.Anthropic(api_key=api_key)
 
     @property
     def is_mock(self) -> bool:
-        return self._client is None
+        return False
 
-    def call(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        max_tokens: int = 4096,
-        temperature: float = 0.0,
-    ) -> LLMResponse:
-        """
-        Call the LLM and return a structured response.
-
-        If no API key is available, returns deterministic mock responses
-        that simulate realistic agent behavior.
-        """
+    def call(self, system_prompt: str, user_prompt: str, max_tokens: int = 4096, temperature: float = 0.0) -> LLMResponse:
         p_hash = hash_prompt(system_prompt, user_prompt)
-
-        if self._client is not None:
-            return self._call_claude(system_prompt, user_prompt, max_tokens, temperature, p_hash)
-        else:
-            return self._call_mock(system_prompt, user_prompt, p_hash)
-
-    def _call_claude(
-        self, system: str, user: str, max_tokens: int, temperature: float, p_hash: str
-    ) -> LLMResponse:
-        """Call the real Claude API."""
         start = time.monotonic()
         try:
             response = self._client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                system=system,
-                messages=[{"role": "user", "content": user}],
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
             )
             latency_ms = (time.monotonic() - start) * 1000
 
@@ -120,10 +123,7 @@ class LLMClient:
             input_tokens = response.usage.input_tokens
             output_tokens = response.usage.output_tokens
 
-            self._total_input_tokens += input_tokens
-            self._total_output_tokens += output_tokens
-            self._total_cost += estimate_cost(self.model, input_tokens, output_tokens)
-            self._call_count += 1
+            self._update_metrics(input_tokens, output_tokens)
 
             return LLMResponse(
                 content=content,
@@ -141,6 +141,20 @@ class LLMClient:
                 model=self.model,
                 prompt_hash=p_hash,
             )
+
+class MockLLMClient(BaseLLMClient):
+    def __init__(self):
+        super().__init__("mock")
+
+    @property
+    def is_mock(self) -> bool:
+        return True
+
+    def call(self, system_prompt: str, user_prompt: str, max_tokens: int = 4096, temperature: float = 0.0) -> LLMResponse:
+        p_hash = hash_prompt(system_prompt, user_prompt)
+        return self._call_mock(system_prompt, user_prompt, p_hash)
+
+
 
     def _call_mock(self, system: str, user: str, p_hash: str) -> LLMResponse:
         """
@@ -298,3 +312,15 @@ class LLMClient:
             "model": self.model if not self.is_mock else "mock",
             "is_mock": self.is_mock,
         }
+
+
+def get_llm_client(model: str = "claude-sonnet-4-20250514") -> AbstractLLMClient:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if api_key:
+        try:
+            import anthropic
+            return ClaudeLLMClient(api_key, model)
+        except ImportError:
+            pass
+    return MockLLMClient()
+
