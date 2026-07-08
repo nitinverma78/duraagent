@@ -126,6 +126,17 @@ class SQLiteStateStore(AbstractStateStore):
                     created_at  TEXT NOT NULL DEFAULT '',
                     UNIQUE(repo_key, fact)
                 );
+
+                -- Signals for external intervention in running/paused workflows.
+                CREATE TABLE IF NOT EXISTS signals (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id      TEXT NOT NULL,
+                    signal_name TEXT NOT NULL,
+                    payload     TEXT NOT NULL DEFAULT '{}',
+                    status      TEXT NOT NULL DEFAULT 'pending',
+                    created_at  TEXT NOT NULL DEFAULT '',
+                    processed_at TEXT
+                );
                 """
             )
 
@@ -255,6 +266,41 @@ class SQLiteStateStore(AbstractStateStore):
                 (repo_key,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    # ── Signal operations (external intervention) ─────────────────────────
+
+    def send_signal(self, run_id: str, signal_name: str, payload: dict[str, Any] | None = None) -> None:
+        """Send a signal to a workflow."""
+        payload_str = json.dumps(payload or {})
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO signals (run_id, signal_name, payload, created_at) "
+                "VALUES (?, ?, ?, datetime('now'))",
+                (run_id, signal_name, payload_str),
+            )
+
+    def get_pending_signals(self, run_id: str) -> list[dict[str, Any]]:
+        """Retrieve and immediately mark signals as processed for a run."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT id, signal_name, payload FROM signals "
+                "WHERE run_id = ? AND status = 'pending' ORDER BY created_at ASC",
+                (run_id,),
+            ).fetchall()
+            
+            if rows:
+                ids = [row["id"] for row in rows]
+                placeholders = ",".join("?" for _ in ids)
+                conn.execute(
+                    f"UPDATE signals SET status = 'processed', processed_at = datetime('now') "
+                    f"WHERE id IN ({placeholders})",
+                    ids,
+                )
+                
+        return [
+            {"signal_name": row["signal_name"], "payload": json.loads(row["payload"])}
+            for row in rows
+        ]
 
     # ── Replay & rebuild (proves events are the source of truth) ──────
 

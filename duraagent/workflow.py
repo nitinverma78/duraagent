@@ -15,11 +15,18 @@ but build it ourselves for full visibility into what's persisted and why.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
+import random
 import time
 import traceback
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Generator
+
+logger = logging.getLogger(__name__)
 
 from duraagent import events
 from duraagent.events import StepStatus, WorkflowStatus
@@ -82,6 +89,43 @@ class StepFailedPermanently(Exception):
         )
 
 
+class DeathLoopDetected(Exception):
+    """Raised when the workflow is caught in an infinite loop of identical states."""
+    
+    def __init__(self, step_name: str, occurrences: int):
+        self.step_name = step_name
+        self.occurrences = occurrences
+        super().__init__(
+            f"Death loop detected: Step '{step_name}' executed {occurrences} times with identical input."
+        )
+
+
+@contextmanager
+def DeterminismContext(is_replaying: bool = False) -> Generator[None, None, None]:
+    """
+    Context manager to enforce determinism during event replay.
+    In a real system, this would monkeypatch time, random, uuid, etc.
+    to ensure replaying events produces identical side-effects.
+    """
+    if is_replaying:
+        original_time = time.time
+        original_random = random.random
+        
+        def _warn_non_deterministic(name: str):
+            logger.warning(f"Non-deterministic call to {name}() during event replay!")
+            
+        time.time = lambda: _warn_non_deterministic("time.time") or original_time()
+        random.random = lambda: _warn_non_deterministic("random.random") or original_random()
+        
+        try:
+            yield
+        finally:
+            time.time = original_time
+            random.random = original_random
+    else:
+        yield
+
+
 class DurableWorkflow:
     """
     Event-sourced durable workflow engine.
@@ -129,14 +173,25 @@ class DurableWorkflow:
             final_step = self.steps[-1]
             step_state = self.store.get_step_state(self.run_id, final_step.name)
             if step_state:
-                import json
                 return json.loads(step_state["output_data"]) if isinstance(step_state["output_data"], str) else step_state["output_data"]
             return {}
         elif existing["status"] == WorkflowStatus.PAUSED.value:
-            # Paused — check for approval and resume
-            self.store.append_event(
-                events.workflow_resumed(self.run_id, "auto_resume")
-            )
+            # Check for signals that might resume or alter the workflow
+            if hasattr(self.store, "get_pending_signals"):
+                signals = self.store.get_pending_signals(self.run_id)
+                if any(s["signal_name"] in ("resume", "approve") for s in signals):
+                    self.store.append_event(
+                        events.workflow_resumed(self.run_id, "signal_resume")
+                    )
+                else:
+                    raise WorkflowPaused("Awaiting approval/signal")
+            else:
+                self.store.append_event(
+                    events.workflow_resumed(self.run_id, "auto_resume")
+                )
+
+        # Track execution signatures for death-loop detection
+        execution_signatures: dict[str, int] = {}
 
         # Execute steps in order
         current_input = initial_input or {}
@@ -150,7 +205,6 @@ class DurableWorkflow:
                     events.step_skipped(self.run_id, step.name, idx)
                 )
                 # Recover the cached output for downstream steps
-                import json
                 cached_output = step_state["output_data"]
                 if isinstance(cached_output, str):
                     cached_output = json.loads(cached_output)
@@ -170,7 +224,17 @@ class DurableWorkflow:
                 raise WorkflowPaused(f"Approval required at step '{step.name}'")
 
             # Execute step with retry policy
-            output = self._execute_step_with_retries(step, idx, current_input)
+            # Death-loop check
+            input_hash = hashlib.md5(json.dumps(current_input, sort_keys=True).encode()).hexdigest()
+            signature = f"{step.name}:{input_hash}"
+            execution_signatures[signature] = execution_signatures.get(signature, 0) + 1
+            
+            if execution_signatures[signature] > 5:
+                raise DeathLoopDetected(step.name, execution_signatures[signature])
+
+            with DeterminismContext(is_replaying=False):
+                output = self._execute_step_with_retries(step, idx, current_input)
+                
             self._step_outputs[step.name] = output
             current_input = output
 
