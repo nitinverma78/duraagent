@@ -76,8 +76,7 @@ class PatchGenerator:
             "Each object in the array MUST have this exact structure:\n"
             "{\n"
             '  "file": "path/to/file.py",\n'
-            '  "old_code": "exact lines to replace",\n'
-            '  "new_code": "replacement code"\n'
+            '  "full_code": "the COMPLETE file content with the fixes applied"\n'
             "}\n"
             "DO NOT wrap your response in markdown blocks. Output raw JSON only."
         )
@@ -121,22 +120,34 @@ class PatchVerifier:
                 patches = [patch_data]
                 
         for p in patches:
-            if isinstance(p, dict) and "old_code" in p and "new_code" in p and "file" in p:
-                target = f"{project_dir}/{p['file']}"
-                res = PatchApplier.apply_simple_patch(target, p["old_code"], p["new_code"])
-                if not res.success:
-                    # fallback for slight indentation mismatches or missing newlines
-                    stripped_old = p["old_code"].strip()
-                    if stripped_old:
-                        try:
-                            with open(target, 'r') as f:
-                                content = f.read()
-                            if stripped_old in content:
-                                content = content.replace(stripped_old, p["new_code"].strip(), 1)
-                                with open(target, 'w') as f:
-                                    f.write(content)
-                        except Exception:
-                            pass
+            if isinstance(p, dict):
+                target = f"{project_dir}/{p.get('file', '')}"
+                
+                # Support full_code replacement (most robust)
+                if "full_code" in p:
+                    try:
+                        with open(target, 'w') as f:
+                            f.write(p["full_code"])
+                    except Exception as e:
+                        print("Failed to write full_code:", e)
+                    continue
+                
+                # Fallback to old_code / new_code replacement
+                if "old_code" in p and "new_code" in p and "file" in p:
+                    res = PatchApplier.apply_simple_patch(target, p["old_code"], p["new_code"])
+                    if not res.success:
+                        # fallback for slight indentation mismatches or missing newlines
+                        stripped_old = p["old_code"].strip()
+                        if stripped_old:
+                            try:
+                                with open(target, 'r') as f:
+                                    content = f.read()
+                                if stripped_old in content:
+                                    content = content.replace(stripped_old, p["new_code"].strip(), 1)
+                                    with open(target, 'w') as f:
+                                        f.write(content)
+                            except Exception:
+                                pass
 
     def verify_and_correct(self, project_dir: str, patch: dict[str, Any], run_id: str, max_corrections: int = 3) -> dict[str, Any]:
         self._apply_patches(project_dir, patch)
@@ -169,8 +180,7 @@ class PatchVerifier:
                 "Each object MUST have this exact structure:\n"
                 "{\n"
                 '  "file": "path/to/file.py",\n'
-                '  "old_code": "exact lines to replace",\n'
-                '  "new_code": "replacement code"\n'
+                '  "full_code": "the COMPLETE file content with the fixes applied"\n'
                 "}\n"
                 "DO NOT wrap your response in markdown blocks. Output raw JSON only."
             )

@@ -216,36 +216,36 @@ class MockLLMClient(BaseLLMClient):
             if "divide" in lower or "division" in lower:
                 content = json.dumps({
                     "file": "calculator.py",
-                    "old_code": "def divide(a, b):\n    return a / b",
-                    "new_code": 'def divide(a, b):\n    if b == 0:\n        raise ValueError("Cannot divide by zero")\n    return a / b',
+                    "old_code": "def divide(a: float, b: float) -> float:\n    \"\"\"\n    Return a divided by b.\n\n    Should raise ValueError if b is zero.\n    \"\"\"\n    # BUG: No division-by-zero handling\n    return a / b",
+                    "new_code": 'def divide(a: float, b: float) -> float:\n    """\n    Return a divided by b.\n\n    Should raise ValueError if b is zero.\n    """\n    if b == 0:\n        raise ValueError("Cannot divide by zero")\n    return a / b',
                     "explanation": "Added zero-division guard with ValueError",
                 })
             elif "average" in lower or "off-by-one" in lower:
                 content = json.dumps({
                     "file": "calculator.py",
-                    "old_code": "return total / (len(numbers) - 1)",
-                    "new_code": "return total / len(numbers)",
+                    "old_code": "    # BUG: Off-by-one — divides by len-1 instead of len\n    return total / (len(numbers) - 1)",
+                    "new_code": "    return total / len(numbers)",
                     "explanation": "Fixed off-by-one: divide by len(numbers), not len-1",
                 })
             elif "power" in lower:
                 content = json.dumps({
                     "file": "calculator.py",
-                    "old_code": "return base * exp",
-                    "new_code": "return base ** exp",
+                    "old_code": "    # BUG: Uses multiplication instead of exponentiation\n    return base * exp",
+                    "new_code": "    return base ** exp",
                     "explanation": "Changed multiplication to exponentiation operator",
                 })
             elif "email" in lower or "validation" in lower:
                 content = json.dumps({
                     "file": "user_service.py",
-                    "old_code": "self.email = email",
-                    "new_code": 'if "@" not in email or "." not in email.split("@")[-1]:\n        raise ValueError(f"Invalid email: {email}")\n    self.email = email',
+                    "old_code": "        # BUG: No email validation (should have @ symbol)\n        self.email = email",
+                    "new_code": '        if "@" not in email:\n            raise ValueError("Invalid email format")\n        self.email = email',
                     "explanation": "Added basic email format validation",
                 })
             elif "generate_id" in lower or "empty" in lower:
                 content = json.dumps({
                     "file": "user_service.py",
-                    "old_code": "return max(existing_ids) + 1",
-                    "new_code": "return max(existing_ids) + 1 if existing_ids else 1",
+                    "old_code": "        # BUG: Fails on empty list (max() arg is an empty sequence)\n        return max(existing_ids) + 1",
+                    "new_code": "        if not existing_ids:\n            return 1\n        return max(existing_ids) + 1",
                     "explanation": "Handle empty list case for ID generation",
                 })
             else:

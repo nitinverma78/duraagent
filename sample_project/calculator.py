@@ -27,7 +27,8 @@ def divide(a: float, b: float) -> float:
 
     Should raise ValueError if b is zero.
     """
-    # BUG: No division-by-zero handling
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
     return a / b
 
 
@@ -40,8 +41,7 @@ def average(numbers: list[float]) -> float:
     if not numbers:
         raise ValueError("Cannot compute average of empty list")
     total = sum(numbers)
-    # BUG: Off-by-one — divides by len-1 instead of len
-    return total / (len(numbers) - 1)
+    return total / len(numbers)
 
 
 def power(base: float, exp: float) -> float:
@@ -50,8 +50,7 @@ def power(base: float, exp: float) -> float:
 
     power(2, 3) should return 8.
     """
-    # BUG: Uses multiplication instead of exponentiation
-    return base * exp
+    return base ** exp
 
 
 def percentage(value: float, total: float) -> float:
