@@ -96,8 +96,8 @@ def main():
         # For demo purposes, we'll mark the 'generate_patch' step as completed manually 
         # and re-run.
         
-        # Simulate approval by rewriting the event to bypass the check, or simply
-        # the human modified the patch manually. We'll just print success for the demo flow.
+        # Simulate approval by sending a resume signal to the workflow store
+        store.send_signal(run_id, "approve")
         
         # We'll just run it again with a normal LLM so it passes the autonomy check and finishes.
         normal_llm = get_llm_client() # Normal mock LLM
