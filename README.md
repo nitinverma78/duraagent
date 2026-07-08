@@ -116,7 +116,7 @@ uv run python run_project.py ./sample_project
 
 Inspect any run dynamically:
 ```bash
-uv run python duraagent/inspector.py duraagent.db
+uv run python duraagent/inspector.py
 ```
 
 
