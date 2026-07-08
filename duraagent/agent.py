@@ -20,7 +20,7 @@ from typing import Any
 from duraagent import events
 from duraagent.contracts import LLM_CALL, PATCH_APPLY, RUN_TESTS
 from duraagent.harness import PatchApplier, SandboxRunner
-from duraagent.llm import AbstractLLMClient
+from duraagent.llm import AbstractLLMClient, get_llm_client
 from duraagent.state_store import SQLiteStateStore
 from duraagent.workflow import DurableWorkflow, RetryPolicy, Step
 from duraagent.tracing import Tracer, traced, set_tracer
@@ -71,7 +71,16 @@ class PatchGenerator:
         self.llm = llm
 
     def generate_patch(self, analysis: dict[str, Any], store: SQLiteStateStore, run_id: str) -> dict[str, Any]:
-        system = "You are an expert Python developer. Generate a patch to fix the bugs."
+        system = (
+            "You are an expert Python developer. Fix the bugs and return the fix as a STRICT JSON array of patches.\n"
+            "Each object in the array MUST have this exact structure:\n"
+            "{\n"
+            '  "file": "path/to/file.py",\n'
+            '  "old_code": "exact lines to replace",\n'
+            '  "new_code": "replacement code"\n'
+            "}\n"
+            "DO NOT wrap your response in markdown blocks. Output raw JSON only."
+        )
         user = f"Fix these bugs: {json.dumps(analysis)}"
         resp = self.llm.call(system, user)
         
@@ -155,7 +164,16 @@ class PatchVerifier:
             if attempt == max_corrections:
                 break
 
-            system = "You are an expert Python developer. Your previous fix failed the tests. Provide a new fix."
+            system = (
+                "You are an expert Python developer. Your previous fix failed the tests. Provide a new fix as a STRICT JSON array of patches.\n"
+                "Each object MUST have this exact structure:\n"
+                "{\n"
+                '  "file": "path/to/file.py",\n'
+                '  "old_code": "exact lines to replace",\n'
+                '  "new_code": "replacement code"\n'
+                "}\n"
+                "DO NOT wrap your response in markdown blocks. Output raw JSON only."
+            )
             user = f"The tests failed with output:\n{test_res.output[-1000:]}\n\nProvide a corrected patch."
             resp = self.llm.call(system, user)
             
