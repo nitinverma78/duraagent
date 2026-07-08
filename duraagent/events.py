@@ -1,22 +1,31 @@
 """
 Immutable event types for the DuraAgent event-sourced state store.
 
-Every action in the system emits an event. Events are append-only, never mutated.
-The event log IS the source of truth — materialized views (workflow_state, step_state)
-are derived projections that can be rebuilt at any time by replaying the log.
+Layer: Software Engineering
+Role:  Every action in the system emits an event.  Events are append-only,
+       never mutated.  The event log IS the source of truth — materialized
+       views (workflow_state, step_state) are derived projections that can
+       be rebuilt at any time by replaying the log.
 
-This is the foundation of durability: if the process crashes, we replay events
-to reconstruct exactly where we were.
+This is the foundation of durability: if the process crashes, we replay
+events to reconstruct exactly where we were.
+
+Design notes:
+- Events use branded ``RunId`` / ``EventId`` types from ``duraagent.types``
+  to prevent accidental interchange of ID strings.
+- ``frozen=True`` + ``extra='forbid'`` ensures strict immutability and
+  rejects unknown fields at construction time.
 """
 
 from __future__ import annotations
 
-import json
 import uuid
 
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
+
+from duraagent.types import RunId, EventId
 
 
 class EventType(str, Enum):
@@ -79,17 +88,18 @@ class Event(BaseModel):
     A single immutable event in the system.
 
     Every event has:
-    - A unique ID
-    - The run it belongs to
-    - A type
-    - A timestamp (UTC)
+    - A unique ``EventId``
+    - The ``RunId`` it belongs to
+    - A type (one of ``EventType``)
+    - A UTC timestamp
     - A payload (arbitrary dict)
-    
-    Using Pydantic ensures strict type validation on creation.
-    """
-    model_config = ConfigDict(frozen=True)
 
-    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    Immutability is enforced by ``frozen=True``.  Unknown fields are
+    rejected by ``extra='forbid'`` to catch contract drift early.
+    """
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    event_id: str = Field(default_factory=lambda: EventId(str(uuid.uuid4())))
     run_id: str = ""
     event_type: str = ""
     timestamp: str = Field(
