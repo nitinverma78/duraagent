@@ -3,7 +3,11 @@ name = "duraagent"
 version = "0.1.0"
 description = "Production-grade self-evolving agentic code review engine"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastcore>=1.14.4",
+    "pydantic>=2.13.4",
+    "pytest>=9.1.1",
+]
 
 [project.optional-dependencies]
 llm = ["anthropic>=0.40.0"]
