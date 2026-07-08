@@ -102,6 +102,18 @@ Run the demos sequentially to understand each architectural layer:
 3. `uv run python demos/demo_evolution.py`
 4. `uv run python demos/demo_full.py`
 
+### Running the Agent on a Project
+
+To unleash DuraAgent on a codebase to automatically discover and patch bugs:
+```bash
+# Run on the included sample project
+uv run python run_project.py ./sample_project
+
+# Note: You must export ANTHROPIC_API_KEY to use the real Claude model
+export ANTHROPIC_API_KEY="your-api-key"
+uv run python run_project.py ./sample_project
+```
+
 Inspect any run dynamically:
 ```bash
 uv run python duraagent/inspector.py duraagent.db
