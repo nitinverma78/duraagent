@@ -22,6 +22,9 @@ from duraagent.harness import PatchApplier, SandboxRunner
 from duraagent.llm import AbstractLLMClient
 from duraagent.state_store import SQLiteStateStore
 from duraagent.workflow import DurableWorkflow, RetryPolicy, Step
+from duraagent.tracing import Tracer, traced, set_tracer
+from duraagent.guardrails import GuardrailPipeline, PatchSafetyGuardrail, RepetitionGuardrail
+from duraagent.memory import WorkingMemory, EpisodicMemory
 
 
 class CodeAnalyzer:
@@ -123,6 +126,11 @@ class Agent:
         self.analyzer = CodeAnalyzer(self.llm)
         self.generator = PatchGenerator(self.llm)
         self.verifier = PatchVerifier(self.llm, self.runner, self.store)
+        
+        # New components
+        self.guardrails = GuardrailPipeline([PatchSafetyGuardrail(), RepetitionGuardrail()])
+        self.working_memory = WorkingMemory(capacity=5)
+        self.episodic_memory = EpisodicMemory(store=self.store)
 
     def review_and_fix(self, project_dir: str, run_id: str | None = None) -> dict[str, Any]:
         """Run the full review and repair loop on a project directory."""
@@ -133,22 +141,51 @@ class Agent:
         ]
 
         workflow = DurableWorkflow("agent_loop", steps, self.store, run_id)
-        return workflow.run({
-            "project_dir": project_dir,
-            "run_id": workflow.run_id,
-        })
+        
+        # Setup Tracing
+        tracer = Tracer(run_id=workflow.run_id)
+        set_tracer(tracer)
+        span = tracer.start_span("agent.review_and_fix")
+        
+        try:
+            result = workflow.run({
+                "project_dir": project_dir,
+                "run_id": workflow.run_id,
+            })
+            tracer.end_span(span)
+            return result
+        except Exception as e:
+            tracer.end_span(span, error=e)
+            raise
 
+    @traced("analyze_code")
     def _step_analyze_code(self, input_data: dict[str, Any]) -> dict[str, Any]:
         project_dir = input_data["project_dir"]
         analysis = self.analyzer.analyze(project_dir)
+        self.working_memory.add(f"Analysis: {analysis}")
         return {"project_dir": project_dir, "run_id": input_data.get("run_id"), "analysis": analysis}
 
+    @traced("generate_patch")
     def _step_generate_patch(self, input_data: dict[str, Any]) -> dict[str, Any]:
         project_dir = input_data["project_dir"]
         analysis = input_data.get("analysis", {})
         run_id = input_data.get("run_id")
 
         patch_data = self.generator.generate_patch(analysis)
+        self.working_memory.add(f"Proposed patch: {patch_data}")
+        
+        # 1. Guardrail Check
+        guardrail_result = self.guardrails.check_all(patch_data)
+        if not guardrail_result.passed:
+            self.store.append_event(
+                events.Event(
+                    run_id=run_id,
+                    event_type="workflow_paused",
+                    payload={"reason": "Guardrail violation", "details": guardrail_result.reason}
+                )
+            )
+            from duraagent.workflow import WorkflowPaused
+            raise WorkflowPaused(f"Guardrail failed: {guardrail_result.reason}")
             
         from duraagent.autonomy import HeuristicScorer
         from duraagent.types import AutonomyLevel
@@ -175,6 +212,7 @@ class Agent:
             "patch": patch_data,
         }
 
+    @traced("verify_and_correct")
     def _step_verify_and_correct(self, input_data: dict[str, Any]) -> dict[str, Any]:
         project_dir = input_data["project_dir"]
         patch = input_data.get("patch", {})

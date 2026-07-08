@@ -46,7 +46,7 @@ def test_skill_library(tmp_path):
     db = tmp_path / "skills.json"
     lib = SkillLibrary(str(db))
     
-    s1 = Skill("s1", "desc", "prompt1")
+    s1 = Skill(name="s1", description="desc", system_prompt="prompt1")
     lib.add_skill(s1)
     
     lib.record_run("s1", 10.0)
@@ -57,5 +57,6 @@ def test_skill_library(tmp_path):
     loaded = lib2.get_skill("s1")
     
     assert loaded.runs == 2
-    assert loaded.avg_reward == 7.5
+    # First run = 10.0. Second run with alpha=0.1 => 0.1 * 5.0 + 0.9 * 10.0 = 9.5
+    assert loaded.avg_reward == 9.5
     assert lib2.get_best_skill().name == "s1"

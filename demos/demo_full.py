@@ -116,8 +116,8 @@ def main():
     metrics = MetricsTracker(store).get_workflow_metrics(run_id)
     print(json.dumps(metrics, indent=2))
     
-    reward = RewardCalculator(MetricsTracker(store)).calculate_reward(run_id)
-    print(f"\n🎯 Final RLVR Reward: {reward}")
+    reward = RewardCalculator(MetricsTracker(store)).calculate_trajectory_reward(run_id)
+    print(f"\n🎯 Final RLVR Trajectory Reward:\n{json.dumps(reward.model_dump(), indent=2)}")
 
     print(f"\n(Inspect full logs using: python duraagent/inspector.py {db_path})")
 
