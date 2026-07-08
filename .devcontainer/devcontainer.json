@@ -3,6 +3,9 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
+  "features": {
+    "ghcr.io/astral-sh/devcontainer-features/uv:1": {}
+  },
   "customizations": {
     "vscode": {
       "settings": {
