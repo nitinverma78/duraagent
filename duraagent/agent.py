@@ -101,10 +101,36 @@ class PatchVerifier:
         self.runner = runner
         self.store = store
 
+    def _apply_patches(self, project_dir: str, patch_data: Any) -> None:
+        patches = []
+        if isinstance(patch_data, list):
+            patches = patch_data
+        elif isinstance(patch_data, dict):
+            if "patches" in patch_data:
+                patches = patch_data["patches"]
+            elif "old_code" in patch_data:
+                patches = [patch_data]
+                
+        for p in patches:
+            if isinstance(p, dict) and "old_code" in p and "new_code" in p and "file" in p:
+                target = f"{project_dir}/{p['file']}"
+                res = PatchApplier.apply_simple_patch(target, p["old_code"], p["new_code"])
+                if not res.success:
+                    # fallback for slight indentation mismatches or missing newlines
+                    stripped_old = p["old_code"].strip()
+                    if stripped_old:
+                        try:
+                            with open(target, 'r') as f:
+                                content = f.read()
+                            if stripped_old in content:
+                                content = content.replace(stripped_old, p["new_code"].strip(), 1)
+                                with open(target, 'w') as f:
+                                    f.write(content)
+                        except Exception:
+                            pass
+
     def verify_and_correct(self, project_dir: str, patch: dict[str, Any], run_id: str, max_corrections: int = 3) -> dict[str, Any]:
-        if "old_code" in patch and "new_code" in patch and "file" in patch:
-            target = f"{project_dir}/{patch['file']}"
-            PatchApplier.apply_simple_patch(target, patch["old_code"], patch["new_code"])
+        self._apply_patches(project_dir, patch)
 
         for attempt in range(1, max_corrections + 1):
             test_res = self.runner.run_tests(project_dir)
@@ -148,9 +174,7 @@ class PatchVerifier:
 
             try:
                 new_patch = json.loads(extract_json(resp.content))
-                if "old_code" in new_patch and "new_code" in new_patch and "file" in new_patch:
-                    target = f"{project_dir}/{new_patch['file']}"
-                    PatchApplier.apply_simple_patch(target, new_patch["old_code"], new_patch["new_code"])
+                self._apply_patches(project_dir, new_patch)
             except json.JSONDecodeError:
                 pass
 
