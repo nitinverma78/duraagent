@@ -64,6 +64,9 @@ class MetricsTracker:
             elif et == EventType.WORKFLOW_COMPLETED.value:
                 end_time = e.timestamp
                 metrics["successful"] = True
+            elif et == EventType.WORKFLOW_FAILED.value:
+                end_time = e.timestamp
+                metrics["successful"] = False
             elif et == EventType.LLM_CALL_RECORDED.value:
                 metrics["llm_calls"] += 1
                 metrics["input_tokens"] += e.payload.get("input_tokens", 0)
