@@ -107,9 +107,4 @@ Inspect any run dynamically:
 uv run python duraagent/inspector.py duraagent.db
 ```
 
-## Engineering Philosophy
 
-This project adopts styles and patterns popularized by:
-- **Pydantic Data Models**: Expressive validation inspired by [Ed Donner](https://github.com/ed-donner).
-- **Fastcore/Functional Programming**: Immutable events and chaining inspired by [Jeremy Howard](https://github.com/jph00) and [Ashwin Rao](https://github.com/coverdrive).
-- **Type-Driven Design**: Robust types and discriminators inspired by modern TypeScript engineering ([Matt Pocock](https://github.com/mattpocock)).
