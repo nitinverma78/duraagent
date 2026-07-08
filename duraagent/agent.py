@@ -32,10 +32,15 @@ class CodeAnalyzer:
     def __init__(self, llm: AbstractLLMClient):
         self.llm = llm
 
-    def analyze(self, project_dir: str) -> dict[str, Any]:
+    def analyze(self, project_dir: str, store: SQLiteStateStore, run_id: str) -> dict[str, Any]:
         system = "You are an expert Python developer. Analyze the code for bugs."
         user = f"Find bugs in the project at {project_dir}"
         resp = self.llm.call(system, user)
+        
+        store.append_event(
+            events.llm_call_recorded(run_id, resp.model, resp.input_tokens, resp.output_tokens)
+        )
+        
         try:
             return json.loads(resp.content)
         except json.JSONDecodeError:
@@ -47,10 +52,15 @@ class PatchGenerator:
     def __init__(self, llm: AbstractLLMClient):
         self.llm = llm
 
-    def generate_patch(self, analysis: dict[str, Any]) -> dict[str, Any]:
+    def generate_patch(self, analysis: dict[str, Any], store: SQLiteStateStore, run_id: str) -> dict[str, Any]:
         system = "You are an expert Python developer. Generate a patch to fix the bugs."
         user = f"Fix these bugs: {json.dumps(analysis)}"
         resp = self.llm.call(system, user)
+        
+        store.append_event(
+            events.llm_call_recorded(run_id, resp.model, resp.input_tokens, resp.output_tokens)
+        )
+        
         try:
             return json.loads(resp.content)
         except json.JSONDecodeError:
@@ -95,6 +105,10 @@ class PatchVerifier:
             system = "You are an expert Python developer. Your previous fix failed the tests. Provide a new fix."
             user = f"The tests failed with output:\n{test_res.output[-1000:]}\n\nProvide a corrected patch."
             resp = self.llm.call(system, user)
+            
+            self.store.append_event(
+                events.llm_call_recorded(run_id, resp.model, resp.input_tokens, resp.output_tokens)
+            )
 
             try:
                 new_patch = json.loads(resp.content)
@@ -161,9 +175,10 @@ class Agent:
     @traced("analyze_code")
     def _step_analyze_code(self, input_data: dict[str, Any]) -> dict[str, Any]:
         project_dir = input_data["project_dir"]
-        analysis = self.analyzer.analyze(project_dir)
+        run_id = input_data.get("run_id")
+        analysis = self.analyzer.analyze(project_dir, self.store, run_id)
         self.working_memory.add(f"Analysis: {analysis}")
-        return {"project_dir": project_dir, "run_id": input_data.get("run_id"), "analysis": analysis}
+        return {"project_dir": project_dir, "run_id": run_id, "analysis": analysis}
 
     @traced("generate_patch")
     def _step_generate_patch(self, input_data: dict[str, Any]) -> dict[str, Any]:
@@ -171,7 +186,7 @@ class Agent:
         analysis = input_data.get("analysis", {})
         run_id = input_data.get("run_id")
 
-        patch_data = self.generator.generate_patch(analysis)
+        patch_data = self.generator.generate_patch(analysis, self.store, run_id)
         self.working_memory.add(f"Proposed patch: {patch_data}")
         
         # 1. Guardrail Check
