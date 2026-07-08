@@ -17,7 +17,6 @@ def main():
     
     # Initialize the state store
     store = SQLiteStateStore("duraagent.db")
-    store.initialize()
     
     # Run the agent
     agent = Agent(store)
