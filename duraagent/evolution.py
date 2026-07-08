@@ -7,13 +7,14 @@ them with RLVR rewards, the system discovers the most effective prompts.
 """
 from __future__ import annotations
 
-from duraagent.llm import LLMClient
-from duraagent.skills import Skill
+from duraagent.llm import get_llm_client, AbstractLLMClient
+from duraagent.metrics import MetricsTracker
+from duraagent.skills import SkillLibrary, Skill
 
 
 class EvolutionEngine:
-    def __init__(self, llm: LLMClient | None = None):
-        self.llm = llm or LLMClient()
+    def __init__(self, llm: AbstractLLMClient | None = None):
+        self.llm = llm or get_llm_client()
 
     def mutate_skill(self, parent_skill: Skill, feedback: str) -> Skill:
         """

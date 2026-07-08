@@ -100,7 +100,11 @@ def main():
         # the human modified the patch manually. We'll just print success for the demo flow.
         
         # We'll just run it again with a normal LLM so it passes the autonomy check and finishes.
-        agent.llm = get_llm_client() # Normal mock LLM
+        normal_llm = get_llm_client() # Normal mock LLM
+        agent.llm = normal_llm
+        agent.generator.llm = normal_llm
+        agent.analyzer.llm = normal_llm
+        agent.verifier.llm = normal_llm
         print("🤖 Agent resuming execution with approved (safer) patch...")
         res = agent.review_and_fix(proj_dir, run_id=run_id)
         
