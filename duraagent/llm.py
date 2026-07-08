@@ -34,7 +34,7 @@ class LLMResponse:
 
 # ── Cost per 1M tokens (approximate, for observability) ───────────────
 COST_PER_1M = {
-    "claude-3-5-sonnet-20240620": {"input": 3.00, "output": 15.00},
+    "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
     "claude-haiku-35-20241022": {"input": 0.80, "output": 4.00},
     "mock": {"input": 0.00, "output": 0.00},
 }
@@ -97,7 +97,7 @@ class BaseLLMClient(AbstractLLMClient):
         }
 
 class ClaudeLLMClient(BaseLLMClient):
-    def __init__(self, api_key: str, model: str = "claude-3-5-sonnet-20240620"):
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-6"):
         super().__init__(model)
         import anthropic
         self._client = anthropic.Anthropic(api_key=api_key)
@@ -314,7 +314,7 @@ class MockLLMClient(BaseLLMClient):
         }
 
 
-def get_llm_client(model: str = "claude-3-5-sonnet-20240620") -> AbstractLLMClient:
+def get_llm_client(model: str = "claude-sonnet-4-6") -> AbstractLLMClient:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if api_key:
         try:
