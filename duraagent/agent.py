@@ -70,7 +70,7 @@ class PatchGenerator:
     def __init__(self, llm: AbstractLLMClient):
         self.llm = llm
 
-    def generate_patch(self, analysis: dict[str, Any], store: SQLiteStateStore, run_id: str) -> dict[str, Any]:
+    def generate_patch(self, analysis: dict[str, Any], project_dir: str, store: SQLiteStateStore, run_id: str) -> dict[str, Any]:
         system = (
             "You are an expert Python developer. Fix the bugs and return the fix as a STRICT JSON array of patches.\n"
             "Each object in the array MUST have this exact structure:\n"
@@ -80,7 +80,24 @@ class PatchGenerator:
             "}\n"
             "DO NOT wrap your response in markdown blocks. Output raw JSON only."
         )
-        user = f"Fix these bugs: {json.dumps(analysis)}"
+        
+        # Read the files mentioned in the analysis
+        files_content = ""
+        try:
+            import os
+            files_to_read = set()
+            for issue in analysis.get("issues", []):
+                files_to_read.add(issue.get("file"))
+            for f in files_to_read:
+                if f:
+                    path = os.path.join(project_dir, f)
+                    if os.path.exists(path):
+                        with open(path, 'r') as fp:
+                            files_content += f"\n--- {f} ---\n{fp.read()}"
+        except Exception:
+            pass
+            
+        user = f"Fix these bugs: {json.dumps(analysis)}\n\nHere are the files:\n{files_content}"
         resp = self.llm.call(system, user)
         
         store.append_event(
@@ -184,7 +201,23 @@ class PatchVerifier:
                 "}\n"
                 "DO NOT wrap your response in markdown blocks. Output raw JSON only."
             )
-            user = f"The tests failed with output:\n{test_res.output[-1000:]}\n\nProvide a corrected patch."
+            
+            # Re-read files that were just patched so it knows the current state
+            files_content = ""
+            try:
+                import os
+                patches = patch if isinstance(patch, list) else [patch]
+                files_to_read = {p.get("file") for p in patches if isinstance(p, dict) and p.get("file")}
+                for f in files_to_read:
+                    if f:
+                        path = os.path.join(project_dir, f)
+                        if os.path.exists(path):
+                            with open(path, 'r') as fp:
+                                files_content += f"\n--- {f} ---\n{fp.read()}"
+            except Exception:
+                pass
+                
+            user = f"Fix these bugs: {test_res.output}. Here was the previous patch: {json.dumps(patch)}\n\nCurrent file contents:\n{files_content}"
             resp = self.llm.call(system, user)
             
             self.store.append_event(
@@ -274,7 +307,7 @@ class Agent:
         analysis = input_data.get("analysis", {})
         run_id = input_data.get("run_id")
 
-        patch_data = self.generator.generate_patch(analysis, self.store, run_id)
+        patch_data = self.generator.generate_patch(analysis, project_dir, self.store, run_id)
         self.working_memory.add(f"Proposed patch: {patch_data}")
         
         # 1. Guardrail Check
